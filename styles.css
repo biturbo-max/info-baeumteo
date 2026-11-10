@@ -45,7 +45,7 @@ textarea{resize:vertical;min-height:84px}
 .error{color:var(--danger);font-size:13px;min-height:20px}
 .note{background:var(--muted);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-2)}
 .brand{display:flex;gap:10px;align-items:center}
-.mark{width:36px;height:36px;border-radius:10px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;flex:none}
+.mark{min-width:36px;height:36px;padding:0 8px;border-radius:10px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:12px;white-space:nowrap;flex:none}
 .brand b{display:block;font-weight:500}.brand small{color:var(--side-dim);font-size:12px}
 
 /* shell */
