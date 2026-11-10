@@ -1,0 +1,19 @@
+{
+  "name": "구암고등학교 정보 배움터",
+  "short_name": "정보 배움터",
+  "description": "구암고등학교 「정보」 2022 개정 교육과정 자료, 평가, AI 도우미",
+  "id": "/info-baeumteo/",
+  "start_url": "/info-baeumteo/",
+  "scope": "/info-baeumteo/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FBF8F3",
+  "theme_color": "#B85632",
+  "lang": "ko",
+  "dir": "ltr",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
