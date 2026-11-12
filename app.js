@@ -61,9 +61,8 @@
   function loginView() {
     const st = S.loginRole === 'student';
     return `<div class="login"><section class="login-intro">
-      <div class="brand"><div class="mark">정</div><div><b>정보 배움터</b><small>고등학교 「정보」 2022 개정 교육과정</small></div></div>
+      <div class="brand"><div class="mark">구암고등학교</div><div><b>정보 배움터</b><small>고등학교 「정보」 2022 개정 교육과정</small></div></div>
       <h1>자료, 평가, AI 도우미를 한곳에서 이어서 배워요</h1>
-      <p>『정보』의 다섯 단원에 맞춰 수업 자료와 형성평가, 수행과제를 정리했어요.</p>
       ${UK.map(u => `<div class="row tone-${U[u].tone}"><span class="chip">${U[u].no}</span><span>${esc(U[u].name)}</span></div>`).join('')}
     </section><section class="login-area"><form class="login-card" id="loginForm" autocomplete="off">
       <h1 style="font-size:26px">로그인</h1>
@@ -110,7 +109,7 @@
   function shell() {
     const st = S.role === 'student';
     return `<div class="app ${st ? '' : 'no-chat'}"><aside class="side">
-      <div class="brand"><div class="mark">정</div><div><b>정보 배움터</b><small>${st ? '2022 개정 교육과정' : '교사용'}</small></div></div>
+      <div class="brand"><div class="mark">구암고등학교</div><div><b>정보 배움터</b><small>${st ? '2022 개정 교육과정' : '교사용'}</small></div></div>
       <div class="side-label">${st ? '학습' : '교사 메뉴'}</div><nav class="nav" id="nav" aria-label="메뉴"></nav>
       <div class="account"><div><b style="font-weight:500">${esc(S.user.name)}</b><br><small>${st ? '학번 ' + esc(S.user.id) : '2학년 정보'}</small></div><button data-a="logout">로그아웃</button></div>
     </aside><main class="main" id="main"></main>${st ? chatShell() : ''}</div>${st ? '<button class="fab" data-a="chatOpen">AI 도우미</button>' : ''}`;
