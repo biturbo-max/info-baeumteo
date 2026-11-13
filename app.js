@@ -1,10 +1,10 @@
 (function () {
   'use strict';
-  const U = window.UNITS, UK = [1, 2, 3, 4, 5], CLASSES = [4, 5, 6, 7];
+  const U = window.UNITS, MS = window.MATERIAL_STEPS || {}, UK = [1, 2, 3, 4, 5], CLASSES = [4, 5, 6, 7];
   const CONFIG = window.APP_CONFIG || { API_URL: '' };
   const hasGas = !!(window.google && google.script && google.script.run);
   const isServer = hasGas || !!CONFIG.API_URL;
-  const S = { role: null, user: null, token: '', view: 'home', u: 1, data: null, T: null, cls: 4, tu: 1, sel: null, detail: null, quiz: null, chat: [], busy: false, loginRole: 'student' };
+  const S = { role: null, user: null, token: '', view: 'home', u: 1, data: null, T: null, cls: 4, tu: 1, sel: null, detail: null, quiz: null, mi: 0, chat: [], busy: false, loginRole: 'student' };
   const ID_RE = /^20[4-7](0[1-9]|[12][0-9]|30)$/;
   const FORBIDDEN = [['대회 참여·수상', /대회|수상|공모전|경시|입상/], ['K-MOOC·MOOC', /MOOC|KOCW|케이무크/i], ['방과후학교', /방과\s*후/], ['연구보고서(소논문)', /소논문|연구\s*보고서/], ['공인어학시험', /토익|토플|TOEIC|TOEFL|텝스/i]];
 
@@ -26,7 +26,7 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 저장 불가 환경 */ } }
   };
   const Local = {
-    rec: id => store.get('ib-' + id) || { logins: [], progress: {}, quiz: {}, tasks: {} },
+    rec: id => store.get('ib-' + id) || { logins: [], progress: {}, quiz: {}, tasks: {}, materialProgress: {} },
     handle(r) {
       if (r.action === 'login') {
         if (!ID_RE.test(r.id)) return { ok: false, error: '등록되지 않은 학번입니다.' };
@@ -35,8 +35,10 @@
       }
       if (r.action === 'teacherLogin') return { ok: false, error: '교사 메뉴는 앱스크립트 서버를 연결해야 사용할 수 있어요.' };
       const id = r.token, d = Local.rec(id); if (!ID_RE.test(id)) return { ok: false, error: '다시 로그인해 주세요.', auth: true };
-      if (r.action === 'bootstrap') return { ok: true, progress: d.progress, quiz: d.quiz, tasks: d.tasks, logins: d.logins, materials: {}, aiEnabled: false };
+      d.materialProgress = d.materialProgress || {};
+      if (r.action === 'bootstrap') return { ok: true, progress: d.progress, quiz: d.quiz, tasks: d.tasks, materialProgress: d.materialProgress, logins: d.logins, materials: {}, aiEnabled: false };
       if (r.action === 'setLesson') { if (r.done) d.progress[r.lesson] = 1; else delete d.progress[r.lesson]; }
+      else if (r.action === 'setMaterialStep') { if (r.done) d.materialProgress[r.step] = 1; else delete d.materialProgress[r.step]; }
       else if (r.action === 'saveQuiz') d.quiz[r.unit] = { score: r.score, total: r.total, perQ: r.perQ, essay: r.essay, ts: Date.now() };
       else if (r.action === 'saveTask') d.tasks[r.key] = { status: r.status, text: r.text, ts: Date.now() };
       else if (r.action === 'chat') return { ok: true, fallback: true };
@@ -94,11 +96,16 @@
     } catch (e) { S.role = null; err.textContent = (e && e.message) || '연결이 잠시 끊겼어요.'; } finally { btn.disabled = false; }
   }
   async function loadAll() {
-    if (S.role === 'student') { S.data = await call('bootstrap'); if (!S.chat.length) S.chat = [['ai', '안녕하세요! 궁금한 개념을 물어보세요. 수행과제의 답을 대신 쓰지는 않지만 힌트는 드릴게요.']]; }
-    else {
+    if (S.role === 'student') {
+      S.data = await call('bootstrap'); S.data.materialProgress = S.data.materialProgress || {};
+      if (!S.chat.length) S.chat = [['ai', '안녕하세요! 궁금한 개념을 물어보세요. 수행과제의 답을 대신 쓰지는 않지만 힌트는 드릴게요.']];
+    } else {
       const t = await call('teacherData');
       const progress = {}; (t.progress || []).forEach(p => { (progress[p[0]] = progress[p[0]] || {})[p[1]] = 1; });
-      t.progress = progress; S.T = t;
+      t.progress = progress;
+      const materialProgress = {}; (t.materialProgress || []).forEach(p => { (materialProgress[p[0]] = materialProgress[p[0]] || {})[p[1]] = 1; });
+      t.materialProgress = materialProgress;
+      S.T = t;
       if (!S.sel) S.sel = classIds(S.cls)[0];
     }
   }
@@ -130,6 +137,7 @@
     if (S.role === 'student') {
       const u = U[S.u], c = $('#ctx'); c.className = 'ctx tone-' + u.tone; c.innerHTML = `<b>현재 맥락</b>${u.no} ${esc(u.name)}`;
       $('#aiStatus').textContent = S.data.aiEnabled ? '이 단원의 내용을 바탕으로 답해요' : '개념 사전 모드';
+      if (S.view === 'material') { const ms = msList(S.u); const st = ms[Math.min(S.mi || 0, ms.length - 1)]; if (st && st.type === 'video' && st.youtubeId) mountYouTube(S.u, st); }
     }
   }
   const unitTabs = (cur, act) => `<div class="row" role="group" aria-label="단원 선택">${UK.map(u => `<button class="chip ${u === cur ? 'tone-' + U[u].tone : 'neutral'}" data-a="${act}" data-u="${u}" ${u === cur ? 'aria-pressed="true"' : ''}>${U[u].no} ${esc(U[u].name)}</button>`).join('')}</div>`;
@@ -137,6 +145,36 @@
 
   /* ---------- 학생 화면 ---------- */
   const doneCount = u => lessons(u).filter(l => S.data.progress[l.key]).length;
+  const msList = u => MS[u] || [];
+  const msKey = (u, k) => u + '-ms-' + k;
+  const msDone = (u, k) => !!(S.data.materialProgress || {})[msKey(u, k)];
+  const msDoneCount = u => msList(u).filter(s => msDone(u, s.key)).length;
+  const msFrame = src => `<div class="ms-frame"><iframe src="${src}" allow="autoplay" allowfullscreen></iframe></div>`;
+
+  /* ---------- 학습 자료 영상(유튜브 IFrame API) ---------- */
+  let ytPlayer = null;
+  function loadYouTubeAPI() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (loadYouTubeAPI._p) return loadYouTubeAPI._p;
+    loadYouTubeAPI._p = new Promise(resolve => {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(); };
+      const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    });
+    return loadYouTubeAPI._p;
+  }
+  async function mountYouTube(unit, step) {
+    try {
+      await loadYouTubeAPI();
+      const el = document.getElementById('yt-' + step.key); if (!el) return;
+      if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) { /* 무시 */ } ytPlayer = null; }
+      ytPlayer = new YT.Player(el, {
+        videoId: step.youtubeId, width: '100%', height: '100%', playerVars: { rel: 0 },
+        events: { onStateChange: ev => { if (ev.data === YT.PlayerState.ENDED) A.msToggle({ k: step.key }); } }
+      });
+    } catch (e) { /* 영상 API를 불러오지 못해도 수동 완료 버튼은 그대로 쓸 수 있다 */ }
+  }
   const V = {};
   V.home = () => {
     const all = UK.flatMap(lessons), d = all.filter(l => S.data.progress[l.key]).length;
@@ -162,8 +200,28 @@
       ${u.groups.map((g, gi) => `<div class="small dim" style="font-weight:500">${esc(g.name)}</div>${ls.filter(l => l.key.startsWith(S.u + '-' + gi + '-')).map(l => { const d = S.data.progress[l.key]; return `<div class="item"><span class="tag">${d ? '완료' : '학습 전'}</span><span class="t"><b>${esc(l.title)}</b><small>교과서 ${esc(l.pages)}쪽</small></span><button class="act" data-a="toggle" data-k="${l.key}">${d ? '완료 취소' : '학습 완료'}</button></div>`; }).join('')}`).join('')}</div>
     <div class="grid g2"><div class="card"><div class="card-head"><h2>형성평가</h2><span class="small dim">6문항</span></div><p class="dim small">${q ? `지난 점수 ${q.score} / ${q.total}` : '풀고 나면 바로 풀이를 볼 수 있어요.'}</p><button class="btn primary wide" data-a="openQuiz" data-u="${S.u}">${q ? '다시 풀기' : '평가 시작'}</button></div>
       <div class="card tone-${u.tone}"><div class="card-head"><h2>수행과제</h2><span class="small dim">${pj.status === 'done' ? '제출 완료' : pj.status === 'draft' ? '작성 중' : '시작 전'}</span></div><h3>${esc(u.project[0])}</h3><p class="small dim">창의·융합 프로젝트 · 교과서 ${esc(u.project[1])}쪽</p><div class="note">${esc(u.aiRule)}</div><button class="btn" data-a="openTasks" data-u="${S.u}">과제 열기</button></div></div>
-    <div class="card"><div class="card-head"><h2>학습 자료</h2></div>${u.materials.map((m, i) => { const url = S.data.materials[S.u + '-m' + i]; return `<div class="item"><span class="tag">${esc(m[0])}</span><span class="t"><b>${esc(m[1])}</b><small>${esc(m[2])}</small></span>${url ? `<a class="act" href="${esc(url)}" target="_blank" rel="noopener">열기</a>` : '<span class="act" style="color:var(--text-2)">링크 준비 중</span>'}</div>`; }).join('')}</div>
+    ${msList(S.u).length ? (() => { const ms = msList(S.u), msc = msDoneCount(S.u); return `<div class="card tone-${u.tone}"><div class="card-head"><h2>학습 자료</h2><span class="small dim">${msc} / ${ms.length} 완료</span></div>${barHtml(pct(msc, ms.length), u.tone)}<p class="dim small">PPT와 영상을 순서대로 보면서 학습해요. 진행 상황은 선생님도 확인할 수 있어요.</p><button class="btn primary wide" data-a="openMaterial" data-u="${S.u}">${msc ? '이어서 학습' : '학습 시작'}</button></div>`; })()
+      : `<div class="card"><div class="card-head"><h2>학습 자료</h2></div>${u.materials.map((m, i) => { const url = S.data.materials[S.u + '-m' + i]; return `<div class="item"><span class="tag">${esc(m[0])}</span><span class="t"><b>${esc(m[1])}</b><small>${esc(m[2])}</small></span>${url ? `<a class="act" href="${esc(url)}" target="_blank" rel="noopener">열기</a>` : '<span class="act" style="color:var(--text-2)">링크 준비 중</span>'}</div>`; }).join('')}</div>`}
     <div class="card tone-${u.tone}"><h2>2022 개정 교육과정 성취기준</h2>${u.standards.map(s => `<div class="std"><span class="mono">${s[0]}</span><span>${esc(s[1])}</span></div>`).join('')}</div>`;
+  };
+  V.material = () => {
+    const u = U[S.u], ms = msList(S.u);
+    if (!ms.length) return V.unit();
+    const i = Math.min(S.mi || 0, ms.length - 1), st = ms[i], done = msDone(S.u, st.key), msc = msDoneCount(S.u);
+    const noVideo = st.type === 'video' && !st.youtubeId && !st.driveId;
+    const body = st.type === 'video'
+      ? (st.youtubeId ? `<div class="ms-frame"><div id="yt-${st.key}"></div></div><p class="dim small">영상을 끝까지 보면 자동으로 완료돼요.</p>`
+        : st.driveId ? msFrame(`https://drive.google.com/file/d/${st.driveId}/preview`)
+        : '<div class="note">선생님이 영상을 연결하면 여기에 나타나요.</div>')
+      : msFrame(`https://drive.google.com/file/d/${st.driveId}/preview`);
+    return `<div class="head"><div><h1>${esc(st.title)}</h1><p class="dim">${u.no} ${esc(u.name)} · ${esc(st.sub || '')}</p></div><button class="btn" data-a="openUnit" data-u="${S.u}">← 단원으로</button></div>
+    <div><div class="row between small dim"><span>자료 학습 진행</span><span class="mono">${msc} / ${ms.length}</span></div>${barHtml(pct(msc, ms.length), u.tone)}</div>
+    <div class="row" role="group" aria-label="자료 선택">${ms.map((s, k) => `<button class="chip ${k === i ? 'tone-' + u.tone : 'neutral'}" data-a="msGo" data-i="${k}">${msDone(S.u, s.key) ? '✓ ' : ''}${k + 1}. ${esc(s.title.length > 12 ? s.title.slice(0, 11) + '…' : s.title)}</button>`).join('')}</div>
+    <div class="card">${body}<div class="row between">
+      <button class="btn" data-a="msGo" data-i="${Math.max(0, i - 1)}" ${i === 0 ? 'disabled' : ''}>이전 자료</button>
+      <button class="btn ${done ? '' : 'primary'}" data-a="msToggle" data-k="${st.key}" ${noVideo ? 'disabled' : ''}>${done ? '완료 취소' : '학습 완료로 표시'}</button>
+      <button class="btn" data-a="msGo" data-i="${Math.min(ms.length - 1, i + 1)}" ${i === ms.length - 1 ? 'disabled' : ''}>다음 자료</button>
+    </div></div>`;
   };
   V.quiz = () => {
     const u = U[S.u], q = S.quiz;
@@ -185,6 +243,7 @@
   V.record = () => `<div class="head"><div><h1>내 학습 기록</h1><p class="dim">${esc(S.user.name)} · 학번 ${esc(S.user.id)}</p></div></div>
     <div class="grid g2"><div class="card"><h2>단원별 진도</h2>${UK.map(u => { const p = pct(doneCount(u), lessons(u).length); return `<div><div class="row between small"><span>${U[u].no} ${esc(U[u].name)}</span><span class="mono dim">${p}%</span></div>${barHtml(p, U[u].tone)}</div>`; }).join('')}</div>
     <div class="card"><h2>형성평가</h2>${UK.map(u => { const q = S.data.quiz[u]; return `<div class="item"><span class="tag">${U[u].no}</span><span class="t"><b>${esc(U[u].name)}</b>${q ? `<small>${fmt(q.ts)}</small>` : ''}</span><span class="mono">${q ? q.score + ' / ' + q.total : '-'}</span></div>`; }).join('')}</div></div>
+    ${UK.some(u => msList(u).length) ? `<div class="card"><h2>학습 자료 진행</h2>${UK.filter(u => msList(u).length).map(u => { const ms = msList(u), n = msDoneCount(u); return `<div><div class="row between small"><span>${U[u].no} ${esc(U[u].name)}</span><span class="mono dim">${n} / ${ms.length}</span></div>${barHtml(pct(n, ms.length), U[u].tone)}</div>`; }).join('')}</div>` : ''}
     <div class="card"><h2>로그인 기록</h2>${S.data.logins.slice(0, 10).map(l => `<div class="log"><span class="mono">${fmt(l.ts)}</span><span>${esc(l.device)}</span><span>${esc(l.name || '-')}</span></div>`).join('')}</div>`;
 
   /* ---------- 교사 화면 ---------- */
@@ -213,6 +272,7 @@
     <div class="grid g4">${kpi('최근 로그인', st ? fmt(st.last) : '-', st ? '총 ' + st.count + '회 접속' : '접속 기록 없음')}${kpi('전체 진도', pct(n, all.length) + '%', `소단원 ${n} / ${all.length}`)}${kpi('형성평가 평균', scored.length ? Math.round(scored.reduce((a, u) => a + pct(q[u].score, q[u].total), 0) / scored.length) + '%' : '-', scored.length + '개 단원 응시')}${kpi('수행과제 제출', UK.flatMap(taskList).filter(t => cellOf(id, t.key) === 'done').length + '건', '')}</div>
     <div class="grid g2"><div class="card"><h2>단원별 진도</h2>${UK.map(u => { const p = pct(lessons(u).filter(l => (T.progress[id] || {})[l.key]).length, lessons(u).length); return `<div><div class="row between small"><span>${U[u].no} ${esc(U[u].name)}</span><span class="mono dim">${p}%</span></div>${barHtml(p, U[u].tone)}</div>`; }).join('')}</div>
     <div class="card"><h2>단원별 형성평가 정답률</h2><div class="columns">${UK.map(u => { const p = q[u] ? pct(q[u].score, q[u].total) : null; return `<div><span class="mono small">${p == null ? '-' : p}</span><i style="height:${p == null ? 0 : p}%"></i><span class="small dim">${U[u].no}</span></div>`; }).join('')}</div></div></div>
+    ${UK.some(u => msList(u).length) ? `<div class="card"><h2>학습 자료 진행률</h2>${UK.filter(u => msList(u).length).map(u => { const ms = msList(u), n = ms.filter(s => (T.materialProgress[id] || {})[msKey(u, s.key)]).length; return `<div><div class="row between small"><span>${U[u].no} ${esc(U[u].name)}</span><span class="mono dim">${n} / ${ms.length}</span></div>${barHtml(pct(n, ms.length), U[u].tone)}</div>`; }).join('')}</div>` : ''}
     ${d ? `<div class="grid g2"><div class="card"><h2>로그인 기록</h2>${d.logins.length ? d.logins.slice(0, 8).map(l => `<div class="log"><span class="mono">${fmt(l.ts)}</span><span>${esc(l.device)}</span><span>${esc(l.name || '-')}</span></div>`).join('') : '<p class="dim">기록이 없어요.</p>'}</div>
     <div class="card"><h2>AI에게 한 질문</h2>${d.ai.length ? d.ai.slice(0, 8).map(a => `<div class="log"><span class="mono">${fmt(a.ts)}</span><span>${a.unit ? U[a.unit].no : ''}</span><span>${esc(a.q)}</span></div>`).join('') : '<p class="dim">기록이 없어요.</p>'}</div></div>
     <div class="card"><h2>수행과제 기록</h2>${Object.keys(d.tasks).length ? Object.keys(d.tasks).map(k => { const t = UK.flatMap(taskList).find(x => x.key === k); return `<div class="item"><span class="tag">${d.tasks[k].status === 'done' ? '제출' : '작성 중'}</span><span class="t"><b>${esc(t ? t.title : k)}</b><small style="white-space:pre-wrap">${esc(d.tasks[k].text)}</small></span></div>`; }).join('') : '<p class="dim">기록이 없어요.</p>'}</div>
@@ -278,6 +338,12 @@
     openTasks(d) { S.u = +d.u; S.view = 'tasks'; render(); $('#main').scrollTop = 0; },
     pickTasks(d) { S.u = +d.u; render(); },
     async toggle(d) { const on = !S.data.progress[d.k]; try { await call('setLesson', { lesson: d.k, done: on }); if (on) S.data.progress[d.k] = 1; else delete S.data.progress[d.k]; render(); } catch (e) { fail(e); } },
+    openMaterial(d) { S.u = +d.u; const ms = msList(S.u), next = ms.findIndex(s => !msDone(S.u, s.key)); S.mi = next === -1 ? 0 : next; S.view = 'material'; render(); $('#main').scrollTop = 0; },
+    msGo(d) { S.mi = +d.i; render(); $('#main').scrollTop = 0; },
+    async msToggle(d) {
+      const key = msKey(S.u, d.k), on = !S.data.materialProgress[key];
+      try { await call('setMaterialStep', { step: key, done: on }); if (on) S.data.materialProgress[key] = 1; else delete S.data.materialProgress[key]; render(); } catch (e) { fail(e); }
+    },
     pick(d) { const q = S.quiz; if (q.picks[q.i] != null) return; q.picks[q.i] = +d.k; render(); },
     essayDone() { const v = $('#essay').value.trim(); if (!v) { toast('답안을 입력해 주세요.'); return; } S.quiz.essay = v; S.quiz.picks[S.quiz.i] = 'e'; render(); },
     async qnext() {

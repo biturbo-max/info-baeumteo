@@ -153,6 +153,19 @@
     }
   };
 
+  // 1단원 "학습 자료"를 AIDT 교안처럼 순서대로 보여주기 위한 데이터 (시범 적용, 다른 단원은 추후 확장).
+  // driveId: 구글 드라이브 파일 ID(미리보기 iframe에 사용). youtubeId: 영상을 유튜브에 올리면 채운다.
+  window.MATERIAL_STEPS = {
+    1: [
+      { key: 'net-ppt', type: 'ppt', title: '네트워크 PPT', sub: '1-1 · 27장', driveId: '1jrXhR4MJE66o_thvHcuxJpYSgfNruccp' },
+      { key: 'net-pdf', type: 'pdf', title: '네트워크 개념 정리', sub: '핵심 개념 요약 PDF', driveId: '1fNfYMoAdgolBI6Z-AT5plnsPEQprI89u' },
+      { key: 'net-video', type: 'video', title: '네트워크 참고 영상', sub: '영상 연결 준비 중', youtubeId: '', driveId: '' },
+      { key: 'iot-ppt', type: 'ppt', title: '사물 인터넷 PPT', sub: '1-2 · 61장', driveId: '1HsrFw5UAw3fSgChinRGueGXBKifrtrbD' },
+      { key: 'iot-pdf', type: 'pdf', title: '사물 인터넷 개념 정리', sub: '핵심 개념 요약 PDF', driveId: '1myZJ1bGsnSFIR9v84R-HfKApcpu-qwQ0' },
+      { key: 'iot-video', type: 'video', title: '사물 인터넷 참고 영상', sub: '영상 연결 준비 중', youtubeId: '', driveId: '' }
+    ]
+  };
+
   // AI 키가 연결되지 않았을 때 쓰는 간단한 개념 사전
   window.GLOSSARY = [
     [['유선', '이더넷'], '유선 네트워크는 케이블로 장치를 직접 연결해요. 빠르고 안정적이지만 설치와 유지에 비용이 들어요.'],
